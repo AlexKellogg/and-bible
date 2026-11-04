@@ -116,11 +116,7 @@ class SpeakControl @Inject constructor(
     val isStopped: Boolean
         get() = !isSpeaking && !isPaused
 
-    private val currentBook: Book?
-        get() = windowControl
-                .activeWindowPageManager
-                .currentPage
-                .currentDocument
+
 
     val sleepTimerActivationTime: Date?
         get() = if (timerTask == null) {
@@ -220,7 +216,8 @@ class SpeakControl @Inject constructor(
             return
         }
         try {
-            val page = windowControl.activeWindowPageManager.currentPage
+           _speakPageManager = windowControl.activeWindowPageManager
+           val page = speakPageManager.currentPage
             if(!page.isSpeakable) {
                 ABEventBus.post(ToastEvent(R.string.speak_no_books_available))
                 return
@@ -241,6 +238,9 @@ class SpeakControl @Inject constructor(
     }
 
     fun speakAny() {
+        if (isStopped) {
+            _speakPageManager = windowControl.activeWindowPageManager
+    }
         val page = speakPageManager.currentPage
         val fromBook = page.currentDocument
         if (fromBook?.bookCategory == BookCategory.BIBLE) {
@@ -256,7 +256,7 @@ class SpeakControl @Inject constructor(
     private val booksAvailable: Boolean get() = SwordDocumentFacade.bibles.isNotEmpty()
 
     private fun speakGeneric() {
-        val page = windowControl.activeWindowPageManager.currentPage
+        val page = speakPageManager.currentPage
         val fromBook = page.currentDocument
         val key =
             if(page is CurrentCommentaryPage)
@@ -348,8 +348,15 @@ class SpeakControl @Inject constructor(
     }
 
     private fun speakBible(verse: Verse) {
-        speakBible(currentBook as SwordBook, verse)
+    val book = speakPageManager.currentPage.currentDocument as? SwordBook
+
+    if (book == null || book.bookCategory != BookCategory.BIBLE) {
+        Log.e(TAG, "Cannot speak Bible - selected document is not a Bible")
+        return
     }
+
+    speakBible(book, verse)
+}
 
     private fun speakAny(bookRef: String, osisRef: String) {
         try {
